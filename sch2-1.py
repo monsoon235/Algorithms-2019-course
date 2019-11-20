@@ -1,6 +1,6 @@
 from typing import List
 
-n: int
+task_num: int
 c: List[List[int]]
 
 now_cost: int
@@ -11,7 +11,7 @@ best_arrangement: List[int]
 
 
 def work_arrange_recursive(arranged_num: int) -> None:
-    global n, c, now_cost, now_arrangement, min_cost, best_arrangement
+    global task_num, c, now_cost, now_arrangement, min_cost, best_arrangement
     if arranged_num >= n and now_cost < min_cost:  # 递归边界
         min_cost = now_cost
         best_arrangement = now_arrangement.copy()
@@ -28,13 +28,13 @@ def work_arrange_recursive(arranged_num: int) -> None:
 
 
 if __name__ == '__main__':
-    n = 2
+    task_num = 2
     c = [
         [1, 2],
         [2, 10],
     ]
     now_cost = 0
-    now_arrangement = [-1 for _ in range(n)]
+    now_arrangement = [-1 for _ in range(task_num)]
     min_cost = sum(sum(row) for row in c) + 1
     work_arrange_recursive(0)
     print(best_arrangement)
