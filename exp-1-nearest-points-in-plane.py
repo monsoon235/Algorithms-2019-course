@@ -28,6 +28,7 @@ def min_dist_point_in_plane_recursive(X: List[Tuple[float, float]], Y: List[Tupl
     # 按中位数进行左右划分，仍保证左右 X, Y 有序
     XL = [p for p in X if p[0] <= mid]
     XR = [p for p in X if p[0] > mid]
+    # todo 可能导致无限递归
     YL = [p for p in Y if p[0] <= mid]
     YR = [p for p in Y if p[0] > mid]
     # 递归寻找左右两边的最近点
@@ -96,7 +97,7 @@ if __name__ == '__main__':
     test(P)
     # 随机点集
     for n in range(1000, 10001, 1000):
-        P = [((random.random() - 0.5) * random.randint(0, 10000),
-              (random.random() - 0.5) * random.randint(0, 10000))
+        P = [((random.random() - 0.5) * 10000,
+              (random.random() - 0.5) * 10000)
              for _ in range(n)]
         test(P)
