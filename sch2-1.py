@@ -12,13 +12,13 @@ best_arrangement: List[int]
 
 def work_arrange_recursive(arranged_num: int) -> None:
     global task_num, c, now_cost, now_arrangement, min_cost, best_arrangement
-    if arranged_num >= n and now_cost < min_cost:  # 递归边界
+    if arranged_num >= task_num and now_cost < min_cost:  # 递归边界
         min_cost = now_cost
         best_arrangement = now_arrangement.copy()
         return
     if now_cost >= min_cost:  # 剪枝
         return
-    for i in range(n):  # 遍历未分配工作，尝试分配
+    for i in range(task_num):  # 遍历未分配工作，尝试分配
         if now_arrangement[i] == -1:  # 工作未被分配
             now_arrangement[i] = arranged_num  # 工作 i 分配给第 arranged_num 个人
             now_cost += c[i][arranged_num]
