@@ -1,4 +1,5 @@
 import random
+import time
 from typing import Tuple
 from enum import Enum, unique
 
@@ -84,6 +85,9 @@ class RedBlackTree:
     root: Node
 
     def __init__(self) -> None:
+        self.clear()
+
+    def clear(self):
         self.nil = Node(Color.Black, 'nil')
         self.nil.parent = self.nil
         self.nil.left = self.nil
@@ -345,20 +349,28 @@ if __name__ == '__main__':
     n = 0
     print('===== 正确性测试 =====')
     for _ in range(1000):
-        if random.random() > 1 / 2 or n <= 0:
-            e = random.randint(0, 999)
-            print(f'=== insert {e} ===')
-            tree.insert(e)
+        if random.random() > 1 / 3 or n <= 0:
+            key = random.randint(0, 999)
+            print(f'\t> insert key = {key}')
+            tree.insert(key)
             n += 1
             # print(tree)
         else:
-            e = random.randint(0, n - 1)
-            print(f'=== delete {e + 1}th ===')
-            tree.delete_by_index(e)
+            index = random.randint(0, n - 1)
+            print(f'\t> delete index = {index}')
+            tree.delete_by_index(index)
             n -= 1
             # print(tree)
         assert tree.check()
     print('===== 正确性测试通过 =====')
     print()
     print('===== 性能测试 =====')
-
+    # todo 性能测试
+    # tree.clear()
+    # for i in range(10000000):
+    #     key = random.randint(0, 999)
+    #     start = time.time()
+    #     tree.insert(key)
+    #     end = time.time()
+    #     if i % 100000 == 0:
+    #         print(end - start)

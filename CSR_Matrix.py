@@ -16,7 +16,6 @@ class Color(Enum):
 
 
 class Vertex:
-    __pre: Optional[Any]
     __color: Color
     __depth: int
 
@@ -124,7 +123,9 @@ class CSR_Matrix:
                 for id in self.col_offset[self.row_start_offset[v.id]:self.row_start_offset[v.id + 1]]
             ]
 
-    def BFS(self, start: Vertex, action):
+    def BFS(self, start: Vertex, end: Vertex) -> List[Vertex]:
+        if start is end:
+            return [start]
         for v in self.vertexes:
             v.color = Color.WHITE
             v.depth = len(self.edges) + 1
@@ -133,20 +134,35 @@ class CSR_Matrix:
         s.color = Color.GRAY
         s.depth = 0
         s.pre = None
-        action(s)
         Q = [s]
+        success = False
         while len(Q) != 0:
             s = Q.pop(0)
             for v in self.get_adj_vertexes(s):
-                if v.color == Color.WHITE:
+                if v is end:
+                    v.pre = s
+                    success = True
+                    break
+                elif v.color == Color.WHITE:
                     v.color = Color.GRAY
                     v.depth = s.depth + 1
                     v.pre = s
-                    action(v)
                     Q.append(v)
             s.color = Color.BLACK
+            if success:
+                break
+        if success:
+            chain = []
+            s = end
+            while s is not None:
+                chain.append(s)
+                s = s.pre
+            return list(reversed(chain))
+        else:
+            return []
 
-    def bidirectional_BFS(self, start: Vertex, end: Vertex) -> List[Vertex]:
+    # FIXME 可能会返回比 BFS 更长的路径
+    def BFS_bidirectional(self, start: Vertex, end: Vertex) -> List[Vertex]:
         if start is end:
             return [start]
         for v in self.vertexes:
@@ -169,7 +185,7 @@ class CSR_Matrix:
         while len(P) != 0 and len(Q) != 0:
             s = P.pop(0)
             for v in self.get_adj_vertexes(s):
-                if v.color == Color.GRAY2:  # 从另一边访问过的顶
+                if v.color == Color.GRAY2:  # 从另一边要访问的顶
                     bridge1 = s
                     bridge2 = v
                     success = True
@@ -188,6 +204,7 @@ class CSR_Matrix:
                     bridge1 = v
                     bridge2 = t
                     success = True
+                    break
                 elif v.color == Color.WHITE:
                     v.color = Color.GRAY2
                     v.depth = t.depth + 1
@@ -212,15 +229,16 @@ class CSR_Matrix:
             return []
 
 
+def get_id_list(l: List[Vertex]) -> List[int]:
+    return [v.id for v in l]
+
+
 if __name__ == '__main__':
     matrix = CSR_Matrix()
-    matrix.load_from_file('facebook_combined.txt')
-    matrix.BFS(matrix.vertexes[0], action=lambda v: print(f'visit {v}'))
-    print([v.id for v in
-           matrix.bidirectional_BFS(matrix.vertexes[0], matrix.vertexes[2333])
-           ])
-    for v in matrix.vertexes:
-        chain = matrix.bidirectional_BFS(matrix.vertexes[0], v)
-        print([v.id for v in chain])
-        if not chain:
-            print(f'{0} and {v} are not connected')
+    matrix.load_from_file('dataset/facebook_combined.txt')
+    print(get_id_list(
+        matrix.BFS(matrix.vertexes[0], matrix.vertexes[3344])
+    ))
+    print(get_id_list(
+        matrix.BFS_bidirectional(matrix.vertexes[0], matrix.vertexes[3344])
+    ))
