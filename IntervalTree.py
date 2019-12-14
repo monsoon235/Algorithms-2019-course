@@ -1,5 +1,6 @@
 import random
 import time
+import math
 import gc
 from typing import Tuple
 from enum import Enum, unique
@@ -9,6 +10,38 @@ from enum import Enum, unique
 class Color(Enum):
     Red = 0
     Black = 1
+
+
+class Interval:
+    @property
+    def low(self):
+        return self.__low
+
+    @low.setter
+    def low(self, value):
+        if not isinstance(value, type(self.__low)):
+            raise TypeError(f"'low must be instance of '{type(self.low)}'")
+        self.__low = value
+
+    @property
+    def high(self):
+        return self.__high
+
+    @high.setter
+    def high(self, value):
+        if not isinstance(value, type(self.__high)):
+            raise TypeError(f"'high must be instance of '{type(self.low)}'")
+        self.__high = value
+
+    def __init__(self, low, high) -> None:
+        if not isinstance(low, type(high)):
+            raise TypeError("'low' and 'high' must be same type")
+        assert low is not None and high is not None
+        self.__low = low
+        self.__high = high
+
+    def __str__(self) -> str:
+        return f'[{self.low}, {self.high}]'
 
 
 class Node:
@@ -24,12 +57,28 @@ class Node:
         self.__color = value
 
     @property
-    def key(self):
-        return self.__key
+    def interval(self):
+        return self.__interval
 
-    @key.setter
-    def key(self, value):
-        self.__key = value
+    @interval.setter
+    def interval(self, value):
+        if not isinstance(value, Interval):
+            raise TypeError("'interval' must be instance of 'Interval'")
+        self.__interval = value
+
+    @property
+    def key(self):
+        return self.interval.low
+
+    @property
+    def max(self):
+        return self.__max
+
+    @max.setter
+    def max(self, value):
+        if not isinstance(value, type(self.__max)):
+            raise TypeError(f"'max' must be instance of '{type(self.__max)}'")
+        self.__max = value
 
     @property
     def parent(self):
@@ -64,21 +113,25 @@ class Node:
             raise TypeError("'right' must be instance of 'Node'")
         self.__right = value
 
-    def __init__(self, color: Color, key, parent=None, left=None, right=None) -> None:
-        self.color = color
-        self.key = key
+    def __init__(self, color: Color, interval: Interval, parent=None, left=None, right=None) -> None:
+        self.__color = color
+        self.__interval = interval
+        self.__max = interval.high
         if parent is not None:
-            self.parent = parent
+            self.__parent = parent
         if left is not None:
-            self.left = left
+            self.__left = left
         if right is not None:
-            self.right = right
+            self.__right = right
 
     def __str__(self) -> str:
         if self.color == Color.Red:
-            return f'\x1b[38;2;255;0;0m{self.key}\x1b[0m'
+            return f'\x1b[38;2;255;0;0m{self.interval}, max={self.max}\x1b[0m'
         else:
-            return f'{self.key}'
+            return f'{self.interval}, max={self.max}'
+
+    def fixMax(self):
+        self.max = max(self.interval.high, self.left.max, self.right.max)
 
 
 class RedBlackTree:
@@ -89,11 +142,17 @@ class RedBlackTree:
         self.clear()
 
     def clear(self):
-        self.nil = Node(Color.Black, 'nil')
+        self.nil = Node(Color.Black, Interval(-math.inf, -math.inf))
         self.nil.parent = self.nil
         self.nil.left = self.nil
         self.nil.right = self.nil
         self.root = self.nil
+
+    def max_fixup(self, node: Node):
+        now = node
+        while now is not self.nil:
+            now.fixMax()
+            now = now.parent
 
     # 将 replacement 移植到 replaced 的位置
     def transplant(self, replaced: Node, replacement: Node):
@@ -120,6 +179,9 @@ class RedBlackTree:
             x.parent.right = y
         y.left = x
         x.parent = y
+        # 修正 max
+        x.fixMax()
+        y.fixMax()
 
     def right_rotate(self, node: Node):
         y = node
@@ -136,9 +198,12 @@ class RedBlackTree:
             y.parent.right = x
         x.right = y
         y.parent = x
+        # 修正 max
+        y.fixMax()
+        x.fixMax()
 
-    def insert(self, key):
-        z = Node(Color.Red, key, self.nil, self.nil, self.nil)
+    def insert(self, interval):
+        z = Node(Color.Red, interval, self.nil, self.nil, self.nil)
         self.insert_node(z)
 
     # 修正 insert 之后的颜色问题
@@ -198,9 +263,13 @@ class RedBlackTree:
             pre.left = node
         else:
             pre.right = node
+
+        # 区间树需要修正 max
+        self.max_fixup(node)
         self.insert_fixup(node)
 
-    def delete(self, key):
+    def delete(self, interval):
+        key = interval.low
         if self.root is self.nil:
             return
         now = self.root
@@ -272,7 +341,8 @@ class RedBlackTree:
             x = y.right
         self.transplant(y, x)
         if y is not z:  # case 3
-            z.key = y.key
+            z.interval = y.interval
+        self.max_fixup(x.parent)
         if y.color == Color.Black:  # 删除黑节点需要 fixup
             self.delete_fixup(x)
 
@@ -318,6 +388,9 @@ class RedBlackTree:
             return -1
         if node.right is not self.nil and node.right.parent is not node:
             return -1
+        if node.max != max(node.interval.high, node.left.max, node.right.max):
+            exit(-1)
+            return -1
         r = self.check_recursive(node.right, node)
         if l == r and l != -1:
             if node.color == Color.Red:
@@ -351,7 +424,8 @@ if __name__ == '__main__':
     print('===== 正确性测试 =====')
     for _ in range(1000):
         if random.random() > 1 / 3 or n <= 0:
-            key = random.randint(0, 999)
+            low = random.randint(0, 999)
+            key = Interval(low, low + random.randint(0, 999))
             print(f'\t> insert key = {key}')
             tree.insert(key)
             n += 1
@@ -374,18 +448,22 @@ if __name__ == '__main__':
         delta = n - last_n
         last_n = n
         for _ in range(delta):
-            tree.insert(random.randint(0, 999))
+            low = random.randint(0, 999)
+            high = random.randint(low, 999 + 1)
+            tree.insert(Interval(low, high))
         insert_sum_time = 0
         delete_sum_time = 0
         repeat_times = 10000
         for _ in range(repeat_times):
-            key = random.randint(0, 999)
+            low = random.randint(0, 999)
+            high = random.randint(low, 999 + 1)
+            interval = Interval(low, high)
             start = time.time()
-            tree.insert(key)
+            tree.insert(interval)
             end = time.time()
             insert_sum_time += end - start
             start = time.time()
-            tree.delete(key)
+            tree.delete(interval)
             end = time.time()
             delete_sum_time += end - start
         print(f'n=2^{k}\n\tinsert cost sum = {insert_sum_time} s\n\tdelete cost sum = {delete_sum_time} s')
