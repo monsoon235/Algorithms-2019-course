@@ -4,6 +4,11 @@ import math
 import gc
 from typing import Tuple
 from enum import Enum, unique
+import pandas as pd
+
+pd.options.display.max_columns = None
+pd.options.display.max_rows = None
+pd.options.display.width = 1000
 
 
 @unique
@@ -114,15 +119,15 @@ class Node:
         self.__right = value
 
     def __init__(self, color: Color, interval: Interval, parent=None, left=None, right=None) -> None:
-        self.__color = color
-        self.__interval = interval
+        self.color = color
+        self.interval = interval
         self.__max = interval.high
         if parent is not None:
-            self.__parent = parent
+            self.parent = parent
         if left is not None:
-            self.__left = left
+            self.left = left
         if right is not None:
-            self.__right = right
+            self.right = right
 
     def __str__(self) -> str:
         if self.color == Color.Red:
@@ -440,10 +445,17 @@ if __name__ == '__main__':
     print('===== 正确性测试通过 =====')
     print()
     print('===== 性能测试 =====')
+    k_list = list(range(1, 21, 1))
+    time_cost = pd.DataFrame(
+        index=pd.Index(data=[f'2^{k}' for k in k_list], name='n=2^k'),
+        columns=pd.Index(['total insert cost', 'total delete cost',
+                          'insert cost / lg(n)', 'delete cost / lg(n)']),
+        dtype=float
+    )
     gc.disable()  # 避免 gc 造成性能波动
     tree.clear()
     last_n = 0
-    for k in range(1, 21, 1):
+    for k in k_list:
         n = 2 ** k
         delta = n - last_n
         last_n = n
@@ -467,6 +479,11 @@ if __name__ == '__main__':
             end = time.time()
             delete_sum_time += end - start
         print(f'n=2^{k}\n\tinsert cost sum = {insert_sum_time} s\n\tdelete cost sum = {delete_sum_time} s')
+        time_cost.loc[f'2^{k}', 'total insert cost'] = insert_sum_time
+        time_cost.loc[f'2^{k}', 'total delete cost'] = delete_sum_time
+        time_cost.loc[f'2^{k}', 'insert cost / lg(n)'] = insert_sum_time / k * 100
+        time_cost.loc[f'2^{k}', 'delete cost / lg(n)'] = delete_sum_time / k * 100
+    print(time_cost)
     gc.enable()
     gc.collect()
     print('===== 性能测试结束 =====')
