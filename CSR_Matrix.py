@@ -1,7 +1,9 @@
 import gc
-from typing import List, Optional, Any
+from typing import List
 import numpy as np
 from enum import Enum, unique
+import time
+import random
 
 
 @unique
@@ -57,6 +59,9 @@ class Vertex:
 
     def __init__(self, id) -> None:
         self.id = id
+        self.pre = None
+        self.depth = 0
+        self.color = Color.WHITE
 
     def __str__(self) -> str:
         return str(self.id)
@@ -67,10 +72,10 @@ class Edge:
 
 
 class CSR_Matrix:
-    row_start_offset: List
-    vertexes: List[Vertex]
-    col_offset: List
-    edges: List[Edge]
+    row_start_offset: List[int]
+    vertexes: List[Vertex]  # 每个顶的信息
+    col_offset: List[int]
+    edges: List[Edge]  # 每个边的信息
 
     def __init__(self) -> None:
         self.row_start_offset = []
@@ -97,9 +102,9 @@ class CSR_Matrix:
                 adj_matrix[a, b] = True
                 adj_matrix[b, a] = True
             # 再压缩成 CSR 格式
-            self.row_start_offset = [None for _ in range(vertex_num)]
+            self.row_start_offset = [-1 for _ in range(vertex_num)]
             self.vertexes = [Vertex(id) for id in sorted(v)]
-            self.col_offset = [None for _ in range(edge_num)]
+            self.col_offset = [-1 for _ in range(edge_num)]
             self.edges = [Edge() for _ in range(edge_num)]
             edge_index = 0
             for i in range(adj_matrix.shape[0]):
@@ -111,6 +116,7 @@ class CSR_Matrix:
             assert edge_index == edge_num
         gc.collect()
 
+    # 获得邻点
     def get_adj_vertexes(self, v: Vertex) -> List:
         if v.id == len(self.row_start_offset) - 1:
             return [
@@ -124,31 +130,30 @@ class CSR_Matrix:
             ]
 
     def BFS(self, start: Vertex, end: Vertex) -> List[Vertex]:
-        if start is end:
+        if start is end:  # 开始与结束重合的特殊情况
             return [start]
         for v in self.vertexes:
-            v.color = Color.WHITE
-            v.depth = len(self.edges) + 1
+            v.color = Color.WHITE  # 标注为未访问
             v.pre = None
         s = start
         s.color = Color.GRAY
         s.depth = 0
         s.pre = None
-        Q = [s]
+        P = [s]  # P 为下次迭代要访问的顶
         success = False
-        while len(Q) != 0:
-            s = Q.pop(0)
+        while len(P) != 0:
+            s = P.pop(0)
             for v in self.get_adj_vertexes(s):
-                if v is end:
+                if v is end:  # 成功找到 end
                     v.pre = s
                     success = True
                     break
-                elif v.color == Color.WHITE:
+                elif v.color == Color.WHITE:  # 未访问的顶标记为即将访问
                     v.color = Color.GRAY
-                    v.depth = s.depth + 1
-                    v.pre = s
-                    Q.append(v)
-            s.color = Color.BLACK
+                    v.depth = s.depth + 1  # 记录深度
+                    v.pre = s  # 记录前驱
+                    P.append(v)
+            s.color = Color.BLACK  # 标记为访问过
             if success:
                 break
         if success:
@@ -157,17 +162,16 @@ class CSR_Matrix:
             while s is not None:
                 chain.append(s)
                 s = s.pre
-            return list(reversed(chain))
+            chain.reverse()
+            return chain
         else:
             return []
 
-    # FIXME 可能会返回比 BFS 更长的路径
     def BFS_bidirectional(self, start: Vertex, end: Vertex) -> List[Vertex]:
         if start is end:
             return [start]
         for v in self.vertexes:
             v.color = Color.WHITE
-            v.depth = len(self.edges) + 1
             v.pre = None
         s = start
         s.color = Color.GRAY1
@@ -182,35 +186,45 @@ class CSR_Matrix:
         bridge1 = None  # 两侧搜索的连通顶
         bridge2 = None
         success = False
-        while len(P) != 0 and len(Q) != 0:
-            s = P.pop(0)
-            for v in self.get_adj_vertexes(s):
-                if v.color == Color.GRAY2:  # 从另一边要访问的顶
-                    bridge1 = s
-                    bridge2 = v
-                    success = True
+        while len(P) != 0 or len(Q) != 0:
+            # 先进行一侧的搜索
+            for _ in range(len(P)):
+                s = P.pop(0)
+                for v in self.get_adj_vertexes(s):
+                    # assert v.color != Color.BLACK2
+                    if v.color == Color.GRAY2:  # v 为另一侧即将访问的点
+                        bridge1 = s
+                        bridge2 = v
+                        success = True
+                        break
+                    elif v.color == Color.WHITE:
+                        v.color = Color.GRAY1
+                        v.depth = s.depth + 1
+                        v.pre = s
+                        P.append(v)
+                s.color = Color.BLACK1
+                if success:
                     break
-                elif v.color == Color.WHITE:
-                    v.color = Color.GRAY1
-                    v.depth = s.depth + 1
-                    v.pre = s
-                    P.append(v)
-            s.color = Color.BLACK1
             if success:
                 break
-            t = Q.pop(0)
-            for v in self.get_adj_vertexes(t):
-                if v.color == Color.GRAY1:
-                    bridge1 = v
-                    bridge2 = t
-                    success = True
+            # 再进行另一侧的搜索
+            for _ in range(len(Q)):
+                t = Q.pop(0)
+                for v in self.get_adj_vertexes(t):
+                    # assert v.color != Color.BLACK1
+                    if v.color == Color.GRAY1:
+                        bridge1 = v
+                        bridge2 = t
+                        success = True
+                        break
+                    elif v.color == Color.WHITE:
+                        v.color = Color.GRAY2
+                        v.depth = t.depth + 1
+                        v.pre = t
+                        Q.append(v)
+                t.color = Color.BLACK2
+                if success:
                     break
-                elif v.color == Color.WHITE:
-                    v.color = Color.GRAY2
-                    v.depth = t.depth + 1
-                    v.pre = t
-                    Q.append(v)
-            t.color = Color.BLACK2
             if success:
                 break
         if success:
@@ -224,7 +238,8 @@ class CSR_Matrix:
                 bridge2 = bridge2.pre
             assert chain1[len(chain1) - 1] is start
             assert chain2[len(chain2) - 1] is end
-            return list(reversed(chain1)) + chain2
+            chain1.reverse()
+            return chain1 + chain2
         else:
             return []
 
@@ -236,9 +251,23 @@ def get_id_list(l: List[Vertex]) -> List[int]:
 if __name__ == '__main__':
     matrix = CSR_Matrix()
     matrix.load_from_file('dataset/facebook_combined.txt')
-    print(get_id_list(
-        matrix.BFS(matrix.vertexes[0], matrix.vertexes[3344])
-    ))
-    print(get_id_list(
-        matrix.BFS_bidirectional(matrix.vertexes[0], matrix.vertexes[3344])
-    ))
+    # 正确性测试与性能测试
+    sum1 = 0
+    sum2 = 0
+    n = 2000
+    for _ in range(n):
+        v1 = matrix.vertexes[random.randint(0, len(matrix.vertexes) - 1)]
+        v2 = matrix.vertexes[random.randint(0, len(matrix.vertexes) - 1)]
+        start = time.time()
+        path1 = matrix.BFS(v1, v2)
+        sum1 += time.time() - start
+        start = time.time()
+        path2 = matrix.BFS_bidirectional(v1, v2)
+        sum2 += time.time() - start
+        if len(path1) != len(path2):
+            print(f'error occurs!')
+            print(f'path by BFS = {get_id_list(path1)}')
+            print(f'path by bidirectional BFS = {get_id_list(path2)}')
+            print()
+    print(f'avg time for BFS = {sum1 / n}')
+    print(f'avg time for bidirectional BFS = {sum2 / n}')
