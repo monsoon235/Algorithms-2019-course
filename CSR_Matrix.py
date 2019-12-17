@@ -72,15 +72,15 @@ class Edge:
 
 
 class CSR_Matrix:
-    row_start_offset: List[int]
-    vertexes: List[Vertex]  # 每个顶的信息
     col_offset: List[int]
+    vertexes: List[Vertex]  # 每个顶的信息
+    col: List[int]
     edges: List[Edge]  # 每个边的信息
 
     def __init__(self) -> None:
-        self.row_start_offset = []
-        self.vertexes = []
         self.col_offset = []
+        self.vertexes = []
+        self.col = []
         self.edges = []
 
     def load_from_file(self, path_to_file: str):
@@ -99,35 +99,30 @@ class CSR_Matrix:
             adj_matrix = np.zeros(shape=(vertex_num, vertex_num), dtype=bool)
             for pair in pairs:
                 a, b = map(int, pair.split(sep=' '))
+                # 无向图
                 adj_matrix[a, b] = True
                 adj_matrix[b, a] = True
             # 再压缩成 CSR 格式
-            self.row_start_offset = [-1 for _ in range(vertex_num)]
+            self.col_offset = [-1 for _ in range(vertex_num)] + [edge_num]  # 最后一个元素作为哨兵，方便实现
             self.vertexes = [Vertex(id) for id in sorted(v)]
-            self.col_offset = [-1 for _ in range(edge_num)]
+            self.col = [-1 for _ in range(edge_num)]
             self.edges = [Edge() for _ in range(edge_num)]
             edge_index = 0
-            for i in range(adj_matrix.shape[0]):
-                self.row_start_offset[i] = edge_index
-                for j in range(adj_matrix.shape[1]):
+            for i in range(vertex_num):
+                self.col_offset[i] = edge_index  # 写入每行的列坐标的起始位置
+                for j in range(vertex_num):
                     if adj_matrix[i, j]:
-                        self.col_offset[edge_index] = j
+                        self.col[edge_index] = j  # 写入列坐标
                         edge_index += 1
             assert edge_index == edge_num
         gc.collect()
 
     # 获得邻点
-    def get_adj_vertexes(self, v: Vertex) -> List:
-        if v.id == len(self.row_start_offset) - 1:
-            return [
-                self.vertexes[id]
-                for id in self.col_offset[self.row_start_offset[v.id]:]
-            ]
-        else:
-            return [
-                self.vertexes[id]
-                for id in self.col_offset[self.row_start_offset[v.id]:self.row_start_offset[v.id + 1]]
-            ]
+    def get_adj_vertexes(self, v: Vertex) -> List[Vertex]:
+        return [
+            self.vertexes[id]
+            for id in self.col[self.col_offset[v.id]:self.col_offset[v.id + 1]]
+        ]
 
     def BFS(self, start: Vertex, end: Vertex) -> List[Vertex]:
         if start is end:  # 开始与结束重合的特殊情况
@@ -156,6 +151,7 @@ class CSR_Matrix:
             s.color = Color.BLACK  # 标记为访问过
             if success:
                 break
+        # 构建最短路径
         if success:
             chain = []
             s = end
@@ -191,7 +187,6 @@ class CSR_Matrix:
             for _ in range(len(P)):
                 s = P.pop(0)
                 for v in self.get_adj_vertexes(s):
-                    # assert v.color != Color.BLACK2
                     if v.color == Color.GRAY2:  # v 为另一侧即将访问的点
                         bridge1 = s
                         bridge2 = v
@@ -211,7 +206,6 @@ class CSR_Matrix:
             for _ in range(len(Q)):
                 t = Q.pop(0)
                 for v in self.get_adj_vertexes(t):
-                    # assert v.color != Color.BLACK1
                     if v.color == Color.GRAY1:
                         bridge1 = v
                         bridge2 = t
@@ -267,7 +261,7 @@ if __name__ == '__main__':
         if len(path1) != len(path2):
             print(f'error occurs!')
             print(f'path by BFS = {get_id_list(path1)}')
-            print(f'path by bidirectional BFS = {get_id_list(path2)}')
+            print(f'path by bidirectional BFS = {get_id_list(path2)} s')
             print()
     print(f'avg time for BFS = {sum1 / n}')
-    print(f'avg time for bidirectional BFS = {sum2 / n}')
+    print(f'avg time for bidirectional BFS = {sum2 / n} s')
